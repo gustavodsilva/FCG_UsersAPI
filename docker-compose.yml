@@ -1,0 +1,58 @@
+# Sobe o UsersAPI isolado, com seu banco e o RabbitMQ, para desenvolvimento deste
+# repositório. A aplicação COMPLETA (4 serviços) sobe pelo docker-compose do
+# repositório de orquestração.
+#
+# Credenciais abaixo são APENAS de desenvolvimento local.
+services:
+  users-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fcg-users-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
+    ports:
+      - "1433:1433"
+    volumes:
+      - users-db-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: fcg-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # painel: http://localhost:15672 (guest / guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  users-api:
+    build: .
+    container_name: fcg-users-api
+    depends_on:
+      users-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__SqlConnection: "Server=users-db,1433;Database=FcgUsersDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
+      Jwt__SecretKey: "chave-secreta-de-desenvolvimento-fiap-cloud-games-2026"
+      Jwt__Issuer: "FCG.UsersAPI"
+      Jwt__Audience: "FCG.Platform"
+      RabbitMq__Host: "rabbitmq"
+      RabbitMq__Username: "guest"
+      RabbitMq__Password: "guest"
+    ports:
+      - "8080:8080"   # Swagger em http://localhost:8080
+    restart: on-failure:3
+
+volumes:
+  users-db-data:

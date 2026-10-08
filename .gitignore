@@ -1,0 +1,39 @@
+# Pastas de build
+bin/
+obj/
+
+# Arquivos do Visual Studio
+.vs/
+
+# Logs
+*.log
+
+# Configurações locais
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Cache do NuGet
+*.nupkg
+packages/
+
+# Resultados e relatórios de teste — são gerados por 'dotnet test' e pelo
+# reportgenerator a cada execução. Versioná-los enche o histórico de arquivos
+# que ninguém lê e que conflitam a cada merge.
+TestResults/
+coveragereport/
+*.cobertura.xml
+*.trx
+
+# Código gerado pelo Reqnroll a partir dos arquivos .feature. É recriado no build:
+# o que precisa estar no repositório é o .feature, não o .cs derivado dele.
+*.feature.cs
+
+# Material das aulas (PDFs pessoais da FIAP, com marca d'água do aluno).
+# Ficam na máquina de cada um e não vão para o repositório.
+Desenvolvimento de API com .NET/
+Entity Framework/
+Mergulhando em DDD/
+Qualidade de Software/
+Qualidade de Software - Pirâmide de Testes/

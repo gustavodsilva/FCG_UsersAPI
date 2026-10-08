@@ -1,0 +1,17 @@
+# Configurações NÃO sensíveis do UsersAPI.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: users-api-config
+  labels:
+    app: users-api
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  Jwt__Issuer: "FCG.UsersAPI"
+  Jwt__Audience: "FCG.Platform"
+  Jwt__ExpirationInMinutes: "60"
+  # Nomes de Service do Kubernetes: o RabbitMQ é publicado pelo repositório de
+  # orquestração com o Service "rabbitmq".
+  RabbitMq__Host: "rabbitmq"
+  RabbitMq__Port: "5672"
+  RabbitMq__VirtualHost: "/"

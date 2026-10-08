@@ -1,0 +1,77 @@
+# Banco do UsersAPI (cada microsserviço tem o seu). SQL Server em Pod único, com
+# volume persistente.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: users-db-pvc
+  labels:
+    app: users-db
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-db
+  labels:
+    app: users-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # volume ReadWriteOnce: nunca dois Pods ao mesmo tempo
+  selector:
+    matchLabels:
+      app: users-db
+  template:
+    metadata:
+      labels:
+        app: users-db
+    spec:
+      containers:
+        - name: sqlserver
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: users-api-secret
+                  key: MSSQL_SA_PASSWORD
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/mssql
+          readinessProbe:
+            tcpSocket:
+              port: 1433
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: users-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-db
+  labels:
+    app: users-db
+spec:
+  type: ClusterIP
+  selector:
+    app: users-db
+  ports:
+    - port: 1433
+      targetPort: 1433
