@@ -105,8 +105,17 @@ dotnet test
 
 ## Kubernetes
 
-Pré-requisitos: cluster local (kind, minikube, k3d ou Docker Desktop) e o RabbitMQ
-publicado pelo repositório de orquestração com o Service `rabbitmq`.
+Pré-requisitos: `kubectl` e um cluster local (kind, minikube, k3d ou Docker Desktop).
+
+O UsersAPI espera um Service chamado `rabbitmq`. Na aplicação completa ele vem do
+repositório de orquestração. Para rodar este serviço isolado, use o RabbitMQ de
+desenvolvimento em `k8s/dev/rabbitmq.yaml` (não aplique os dois ao mesmo tempo).
+
+Exemplo com kind:
+
+```bash
+kind create cluster --name fcg
+```
 
 ```bash
 # 1. Construir a imagem
@@ -116,10 +125,13 @@ docker build -t fcg-users-api:latest .
 kind load docker-image fcg-users-api:latest        # kind
 # minikube image load fcg-users-api:latest         # minikube
 
-# 3. Aplicar os manifestos
+# 3. Subir o RabbitMQ de desenvolvimento (somente ao rodar este serviço isolado)
+kubectl apply -f k8s/dev/rabbitmq.yaml
+
+# 4. Aplicar os manifestos do UsersAPI
 kubectl apply -f k8s/
 
-# 4. Conferir
+# 5. Conferir (aguarde 2 a 3 minutos: o SQL Server demora para ficar pronto)
 kubectl get pods
 kubectl get svc
 ```
@@ -137,3 +149,24 @@ Manifestos em `k8s/`:
 Os valores do Secret são de desenvolvimento. Não use em ambiente real.
 
 Health checks: `GET /health` (readiness, inclui o RabbitMQ) e `GET /health/live` (liveness).
+
+### Testar no cluster
+
+```bash
+kubectl port-forward svc/users-api 8080:80
+```
+
+Em outro terminal:
+
+```bash
+curl -s http://localhost:8080/health
+
+curl -s -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Joao","email":"joao@email.com","login":"joao","password":"Senha@123"}'
+
+kubectl exec deploy/rabbitmq -- rabbitmqctl list_exchanges | grep UserCreatedEvent
+```
+
+Na primeira subida, uma das réplicas pode reiniciar uma vez: as duas tentam aplicar a
+migration ao mesmo tempo, uma encerra e o Kubernetes a reinicia. É esperado e se resolve sozinho.
