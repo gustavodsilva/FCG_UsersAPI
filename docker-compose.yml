@@ -1,11 +1,13 @@
-# Credenciais abaixo são APENAS de desenvolvimento local.
+# Sobe o UsersAPI isolado (com seu banco e o RabbitMQ) para desenvolvimento.
+# A aplicação COMPLETA sobe pelo compose do repositório de orquestração.
+# Os segredos vêm do arquivo .env (copie de .env.example).
 services:
   users-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: fcg-users-db
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Defina MSSQL_SA_PASSWORD no .env}
     ports:
       - "1433:1433"
     volumes:
@@ -20,9 +22,12 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: fcg-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?Defina RABBITMQ_PASS no .env}
     ports:
       - "5672:5672"
-      - "15672:15672"   # painel: http://localhost:15672 (guest / guest)
+      - "15672:15672"   # painel: http://localhost:15672
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -32,6 +37,7 @@ services:
 
   users-api:
     build: .
+    image: gustavotianosilva/fcg-users-api:1.0.0
     container_name: fcg-users-api
     depends_on:
       users-db:
@@ -39,13 +45,13 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      ConnectionStrings__SqlConnection: "Server=users-db,1433;Database=FcgUsersDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
-      Jwt__SecretKey: "chave-secreta-de-desenvolvimento-fiap-cloud-games-2026"
+      ConnectionStrings__SqlConnection: "Server=users-db,1433;Database=FcgUsersDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?Defina JWT_SECRET_KEY no .env}
       Jwt__Issuer: "FCG.UsersAPI"
       Jwt__Audience: "FCG.Platform"
       RabbitMq__Host: "rabbitmq"
-      RabbitMq__Username: "guest"
-      RabbitMq__Password: "guest"
+      RabbitMq__Username: ${RABBITMQ_USER}
+      RabbitMq__Password: ${RABBITMQ_PASS}
     ports:
       - "8080:8080"   # Swagger em http://localhost:8080
     restart: on-failure:3

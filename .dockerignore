@@ -9,3 +9,4 @@ k8s/
 docker-compose.yml
 *.md
 **/appsettings.Development.json
+.env
