@@ -1,7 +1,3 @@
-# Sobe o UsersAPI isolado, com seu banco e o RabbitMQ, para desenvolvimento deste
-# repositório. A aplicação COMPLETA (4 serviços) sobe pelo docker-compose do
-# repositório de orquestração.
-#
 # Credenciais abaixo são APENAS de desenvolvimento local.
 services:
   users-db:
