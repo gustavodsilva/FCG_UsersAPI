@@ -1,15 +1,15 @@
 # FCG Users API
 
-Microsserviço de **Usuários** da FIAP Cloud Games (FCG) — Tech Challenge, Fase 2.
+Microsserviço de **Usuários** da FIAP Cloud Games (FCG), Tech Challenge Fase 2.
 
 ## Finalidade
 
 - Cadastro de usuários (`POST /api/auth/register`)
 - Autenticação com geração de token JWT (`POST /api/auth/login`)
-- Autorização por perfil (`Admin` e `Client`) e administração de usuários (`/api/users`, apenas Admin)
-- Publica o evento `UserCreatedEvent` no RabbitMQ a cada cadastro
+- Autorização por perfil (`Admin` e `Client`) e administração de usuários (`/api/users`, somente Admin)
+- Publicação do evento `UserCreatedEvent` no RabbitMQ a cada cadastro
 
-Os demais serviços (Catálogo, Pagamentos e Notificações) ficam em repositórios próprios.
+Catálogo, Pagamentos e Notificações ficam em repositórios próprios. O UsersAPI não chama nenhum deles: só publica eventos.
 
 ## Fluxo orientado a eventos
 
@@ -19,16 +19,16 @@ UsersAPI --(UserCreatedEvent)--> RabbitMQ --> NotificationsAPI (e-mail de boas-v
 
 Contrato do evento (namespace `FCG.Contracts.Events`):
 
-| Campo     | Tipo     | Descrição                    |
-|-----------|----------|------------------------------|
-| UserId    | int      | Id do usuário criado         |
-| Name      | string   | Nome                         |
-| Email     | string   | E-mail de destino            |
-| CreatedAt | DateTime | Data de criação              |
+| Campo     | Tipo     | Descrição            |
+|-----------|----------|----------------------|
+| UserId    | int      | Id do usuário criado |
+| Name      | string   | Nome                 |
+| Email     | string   | E-mail de destino    |
+| CreatedAt | DateTime | Data de criação      |
 
-Atenção: o NotificationsAPI deve declarar o evento com o **mesmo namespace e nome**
-(`FCG.Contracts.Events.UserCreatedEvent`). O MassTransit nomeia a exchange a partir
-deles; se divergirem, a mensagem não chega ao consumidor.
+A senha nunca vai no evento. O consumidor deve declarar o evento com o mesmo namespace e nome
+(`FCG.Contracts.Events.UserCreatedEvent`): o MassTransit nomeia a exchange a partir deles, e se
+divergirem a mensagem não chega. Detalhes e exemplo de consumer em [docs/INTEGRACAO.md](docs/INTEGRACAO.md).
 
 ## Estrutura
 
@@ -36,66 +36,101 @@ deles; se divergirem, a mensagem não chega ao consumidor.
 src/
   FCG.Users.Api             controllers, middlewares, health checks, configuração
   FCG.Users.Domain          entidades, regras de negócio, contrato do evento
-  FCG.Users.Infrastructure  EF Core, repositórios, migrations, MassTransit/RabbitMQ
+  FCG.Users.Infrastructure  EF Core, repositórios, migrations, JWT, MassTransit/RabbitMQ
 tests/
   FCG.Users.UnitTests       testes de unidade e cenários BDD
   FCG.Users.IntegrationTests
-k8s/                        Deployment, Service, ConfigMap, Secret (+ banco do serviço)
+docs/                       guia de integração para quem consome o evento
+k8s/                        manifestos de referência (os oficiais ficam na orquestração)
 Dockerfile                  multi-stage (restore, publish, runtime)
 docker-compose.yml          UsersAPI + SQL Server + RabbitMQ, para rodar isolado
+.env.example                modelo das variáveis secretas do Compose
 ```
 
-## Variáveis de ambiente
+## Variáveis de ambiente da aplicação
 
-No .NET, `__` (dois underscores) representa `:` na configuração.
+No .NET, `__` (dois underscores) representa `:` na configuração. O `appsettings.json` da imagem
+não traz credenciais: segredos e dados de conexão chegam por variáveis de ambiente.
 
-| Variável                          | Sensível | Descrição                                   | Padrão (dev)              |
-|-----------------------------------|----------|---------------------------------------------|---------------------------|
-| `ConnectionStrings__SqlConnection`| Sim      | Connection string do SQL Server             | localhost, banco FcgUsersDb |
-| `Jwt__SecretKey`                  | Sim      | Chave de assinatura (mínimo 32 caracteres)  | chave de desenvolvimento  |
-| `Jwt__Issuer`                     | Não      | Emissor do token                            | `FCG.UsersAPI`            |
-| `Jwt__Audience`                   | Não      | Audiência do token                          | `FCG.Platform`            |
-| `Jwt__ExpirationInMinutes`        | Não      | Validade do token                           | `60`                      |
-| `RabbitMq__Host`                  | Não      | Host do RabbitMQ                            | `localhost`               |
-| `RabbitMq__Port`                  | Não      | Porta AMQP                                  | `5672`                    |
-| `RabbitMq__VirtualHost`           | Não      | Virtual host                                | `/`                       |
-| `RabbitMq__Username`              | Sim      | Usuário do broker                           | `guest`                   |
-| `RabbitMq__Password`              | Sim      | Senha do broker                             | `guest`                   |
-| `ASPNETCORE_ENVIRONMENT`          | Não      | Ambiente (Development / Production)         | `Production` no container |
+| Variável                           | Sensível | Descrição                                    | Padrão                |
+|------------------------------------|----------|----------------------------------------------|-----------------------|
+| `ConnectionStrings__SqlConnection` | Sim      | Connection string do SQL Server              | nenhum (obrigatória)  |
+| `Jwt__SecretKey`                   | Sim      | Chave de assinatura (mínimo 32 caracteres)   | nenhum (obrigatória)  |
+| `Jwt__Issuer`                      | Não      | Emissor do token                             | `FCG.UsersAPI`        |
+| `Jwt__Audience`                    | Não      | Audiência do token                           | `FCG.Platform`        |
+| `Jwt__ExpirationInMinutes`         | Não      | Validade do token                            | `60`                  |
+| `RabbitMq__Host`                   | Não      | Host do RabbitMQ                             | `localhost`           |
+| `RabbitMq__Port`                   | Não      | Porta AMQP                                   | `5672`                |
+| `RabbitMq__VirtualHost`            | Não      | Virtual host                                 | `/`                   |
+| `RabbitMq__Username`               | Sim      | Usuário do broker                            | nenhum (obrigatória)  |
+| `RabbitMq__Password`               | Sim      | Senha do broker                              | nenhum (obrigatória)  |
 
-`Jwt__SecretKey`, `Jwt__Issuer` e `Jwt__Audience` precisam ser **iguais** nos serviços que
-validam o token emitido por este (Catálogo, Pagamentos).
+`Jwt__SecretKey`, `Jwt__Issuer` e `Jwt__Audience` precisam ser **iguais** nos serviços que validam
+o token emitido por este.
 
-## Executar com Docker Compose (este serviço isolado)
+## Executar com Docker Compose
 
-```bash
-docker compose up -d --build
-```
+O Compose lê os segredos do arquivo `.env`, que não vai para o Git.
 
-- Swagger: http://localhost:8080
-- Painel do RabbitMQ: http://localhost:15672 (guest / guest)
+1. Crie o `.env` a partir do modelo:
 
-Usuários criados na primeira execução: `admin` / `Admin@123` (Admin) e alguns clientes
-(veja `DbInitializer`).
+   ```bash
+   cp .env.example .env
+   ```
 
-Teste o fluxo de cadastro:
+2. Preencha as quatro variáveis:
 
-```bash
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Maria","email":"maria@email.com","login":"maria","password":"Senha@123"}'
-```
+   | Variável             | Descrição                                          |
+   |----------------------|----------------------------------------------------|
+   | `MSSQL_SA_PASSWORD`  | Senha do SQL Server (8+ caracteres, com maiúscula, minúscula, número e símbolo) |
+   | `JWT_SECRET_KEY`     | Chave do JWT (32+ caracteres, igual à dos outros serviços) |
+   | `RABBITMQ_USER`      | Usuário do RabbitMQ                                |
+   | `RABBITMQ_PASS`      | Senha do RabbitMQ                                  |
 
-No painel do RabbitMQ, a exchange `FCG.Contracts.Events:UserCreatedEvent` passa a existir.
+3. Suba tudo:
 
-## Executar localmente (sem Docker para a API)
+   ```bash
+   docker compose up -d --build
+   docker compose ps
+   ```
 
-Suba apenas as dependências e rode a API:
+4. Acesse:
+   - Swagger: http://localhost:8080
+   - Painel do RabbitMQ: http://localhost:15672 (usuário e senha do `.env`)
+
+O SQL Server guarda a senha dentro do volume. Se você trocar o `MSSQL_SA_PASSWORD` depois da primeira
+execução, rode `docker compose down -v` antes de subir de novo (isso apaga os dados do banco).
+
+## Testar o fluxo de cadastro
+
+Pelo Swagger (http://localhost:8080):
+
+1. `POST /api/auth/register` com nome, e-mail, login e senha. Esperado: `201`, com `perfil: 2` (Client).
+2. `POST /api/auth/login`. Esperado: `200`, com o `token`.
+3. No painel do RabbitMQ, em **Exchanges**, confira `FCG.Contracts.Events:UserCreatedEvent`.
+
+Para os endpoints protegidos, clique em **Authorize** e informe `Bearer {token}` (com a palavra
+`Bearer`, um espaço e o token). `GET /api/users` exige perfil Admin: com token de Client retorna `403`.
+
+O seed cria um administrador para desenvolvimento: login `admin`, senha `Admin@123`.
+
+## Autenticação e perfis
+
+O token JWT é emitido por este serviço e validado localmente pelos demais (assinatura, Issuer, Audience
+e validade), sem consulta ao UsersAPI. O token carrega o id do usuário, e-mail, nome e perfil
+(`Admin` ou `Client`).
+
+## Executar a API fora do Docker
+
+Suba só as dependências e rode a API:
 
 ```bash
 docker compose up -d users-db rabbitmq
 dotnet run --project src/FCG.Users.Api
 ```
+
+Crie `src/FCG.Users.Api/appsettings.Development.json` (ignorado pelo Git e pela imagem) com a
+connection string, a chave do JWT e o usuário e a senha do RabbitMQ, usando os mesmos valores do seu `.env`.
 
 ## Testes
 
@@ -103,70 +138,24 @@ dotnet run --project src/FCG.Users.Api
 dotnet test
 ```
 
+## Imagem Docker
+
+Publicada no Docker Hub: `gustavotianosilva/fcg-users-api`.
+
+| Tag      | Uso                                                        |
+|----------|------------------------------------------------------------|
+| `1.0.0`  | Versão fixa, a que a orquestração deve referenciar        |
+| `latest` | Última publicada                                           |
+
+A imagem roda sem root na porta `8080` e não contém credenciais.
+
 ## Kubernetes
 
-Pré-requisitos: `kubectl` e um cluster local (kind, minikube, k3d ou Docker Desktop).
+Os manifestos oficiais (Deployment, Service, ConfigMap e Secret) ficam no repositório de orquestração
+(FCG-Orchestration). A pasta `k8s/` deste repositório é uma versão de referência e pode estar
+desatualizada em relação a ele. No cluster, o serviço fica acessível aos demais em `http://users-api:80`.
 
-O UsersAPI espera um Service chamado `rabbitmq`. Na aplicação completa ele vem do
-repositório de orquestração. Para rodar este serviço isolado, use o RabbitMQ de
-desenvolvimento em `k8s/dev/rabbitmq.yaml` (não aplique os dois ao mesmo tempo).
+## Health checks
 
-Exemplo com kind:
-
-```bash
-kind create cluster --name fcg
-```
-
-```bash
-# 1. Construir a imagem
-docker build -t fcg-users-api:latest .
-
-# 2. Disponibilizar a imagem no cluster
-kind load docker-image fcg-users-api:latest        # kind
-# minikube image load fcg-users-api:latest         # minikube
-
-# 3. Subir o RabbitMQ de desenvolvimento (somente ao rodar este serviço isolado)
-kubectl apply -f k8s/dev/rabbitmq.yaml
-
-# 4. Aplicar os manifestos do UsersAPI
-kubectl apply -f k8s/
-
-# 5. Conferir (aguarde 2 a 3 minutos: o SQL Server demora para ficar pronto)
-kubectl get pods
-kubectl get svc
-```
-
-Manifestos em `k8s/`:
-
-| Arquivo           | Recurso                                                |
-|-------------------|--------------------------------------------------------|
-| `configmap.yaml`  | ConfigMap `users-api-config` (configurações não sensíveis) |
-| `secret.yaml`     | Secret `users-api-secret` (connection string, JWT, broker) |
-| `users-db.yaml`   | PVC, Deployment e Service do SQL Server do serviço     |
-| `deployment.yaml` | Deployment `users-api` (2 réplicas, probes, resources) |
-| `service.yaml`    | Service `users-api` (porta 80, acessível em `http://users-api:80`) |
-
-Os valores do Secret são de desenvolvimento. Não use em ambiente real.
-
-Health checks: `GET /health` (readiness, inclui o RabbitMQ) e `GET /health/live` (liveness).
-
-### Testar no cluster
-
-```bash
-kubectl port-forward svc/users-api 8080:80
-```
-
-Em outro terminal:
-
-```bash
-curl -s http://localhost:8080/health
-
-curl -s -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Joao","email":"joao@email.com","login":"joao","password":"Senha@123"}'
-
-kubectl exec deploy/rabbitmq -- rabbitmqctl list_exchanges | grep UserCreatedEvent
-```
-
-Na primeira subida, uma das réplicas pode reiniciar uma vez: as duas tentam aplicar a
-migration ao mesmo tempo, uma encerra e o Kubernetes a reinicia. É esperado e se resolve sozinho.
+- `GET /health`: readiness, inclui a conexão com o RabbitMQ
+- `GET /health/live`: liveness, só indica que o processo responde
