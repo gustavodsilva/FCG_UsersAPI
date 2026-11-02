@@ -1,6 +1,7 @@
+using FCG.Contracts.Events;
 using FCG.Users.Domain.Entity;
-using FCG.Users.Domain.Interfaces;
 using FCG.Users.Domain.Exceptions;
+using FCG.Users.Domain.Interfaces;
 using FCG.Users.Domain.Models.User;
 using FCG.Users.Domain.Services;
 using FCG.Users.Infrastructure.Repository;
@@ -206,8 +207,7 @@ public class FakeEventPublisher : IEventPublisher
 {
     public List<object> Published { get; } = new();
 
-    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
-        where TEvent : class
+    public Task Publish(UserCreatedEvent @event, CancellationToken cancellationToken = default)
     {
         Published.Add(@event);
         return Task.CompletedTask;

@@ -1,3 +1,5 @@
+using FCG.Contracts.Events;
+
 namespace FCG.Users.Domain.Interfaces;
 
 /// <summary>
@@ -6,6 +8,5 @@ namespace FCG.Users.Domain.Interfaces;
 /// </summary>
 public interface IEventPublisher
 {
-    Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
-        where TEvent : class;
+    Task Publish(UserCreatedEvent userCreatedEvent, CancellationToken cancellationToken = default);
 }

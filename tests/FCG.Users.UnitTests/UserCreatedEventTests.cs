@@ -38,7 +38,7 @@ public class UserCreatedEventTests
             Password = "Senha@123"
         });
 
-        _publisher.Verify(p => p.PublishAsync(
+        _publisher.Verify(p => p.Publish(
             It.Is<UserCreatedEvent>(e =>
                 e.UserId == 42 &&
                 e.Name == "Gabriela" &&
@@ -60,7 +60,7 @@ public class UserCreatedEventTests
             Password = "Senha@123"
         }));
 
-        _publisher.Verify(p => p.PublishAsync(It.IsAny<UserCreatedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+        _publisher.Verify(p => p.Publish(It.IsAny<UserCreatedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class UserCreatedEventTests
     {
         UserCreatedEvent? publicado = null;
 
-        _publisher.Setup(p => p.PublishAsync(It.IsAny<UserCreatedEvent>(), It.IsAny<CancellationToken>()))
+        _publisher.Setup(p => p.Publish(It.IsAny<UserCreatedEvent>(), It.IsAny<CancellationToken>()))
             .Callback<UserCreatedEvent, CancellationToken>((e, _) => publicado = e)
             .Returns(Task.CompletedTask);
 

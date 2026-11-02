@@ -84,9 +84,7 @@ public static class DependencyInjection
     /// As configurações vêm da seção "Jwt" do appsettings — as mesmas usadas pelo
     /// TokenService para assinar, de modo que assinatura e validação sempre batem.
     /// </summary>
-    public static IServiceCollection AddJwtAuthentication(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var jwt = configuration.GetSection(JwtSettings.SecaoConfiguracao).Get<JwtSettings>() 
             ?? 
