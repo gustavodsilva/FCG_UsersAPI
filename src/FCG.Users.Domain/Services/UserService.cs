@@ -41,12 +41,11 @@ public class UserService : IUserService
 
         // Fluxo de cadastro: o NotificationsAPI consome este evento e envia o
         // e-mail de boas-vindas. Só publicamos depois que o usuário foi gravado.
-        await _eventPublisher.PublishAsync(new UserCreatedEvent
+        await _eventPublisher.Publish(new UserCreatedEvent
         {
             UserId = createdUser.Id,
             Name = createdUser.Name,
-            Email = createdUser.Email,
-            CreatedAt = createdUser.CreatedAt
+            Email = createdUser.Email
         });
 
         return new UserResponse
@@ -55,8 +54,7 @@ public class UserService : IUserService
             Name = createdUser.Name,
             Email = createdUser.Email,
             Login = createdUser.Login,
-            Perfil = createdUser.Perfil,
-            CreatedAt = createdUser.CreatedAt
+            Perfil = createdUser.Perfil
         };
     }
 

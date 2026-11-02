@@ -1,3 +1,4 @@
+using FCG.Contracts.Events;
 using FCG.Users.Domain.Interfaces;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -20,18 +21,17 @@ public class MassTransitEventPublisher : IEventPublisher
         _logger = logger;
     }
 
-    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
-        where TEvent : class
+    public async Task Publish(UserCreatedEvent userCreatedEvent, CancellationToken cancellationToken = default)
     {
         try
         {
-            await _publishEndpoint.Publish(@event, cancellationToken);
+            await _publishEndpoint.Publish(userCreatedEvent, cancellationToken);
 
-            _logger.LogInformation("Evento {EventType} publicado.", typeof(TEvent).Name);
+            _logger.LogInformation("Evento {EventType} publicado.", typeof(UserCreatedEvent).Name);
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Falha ao publicar o evento {EventType}.", typeof(TEvent).Name);
+            _logger.LogError(exception, "Falha ao publicar o evento {EventType}.", typeof(UserCreatedEvent).Name);
         }
     }
 }
