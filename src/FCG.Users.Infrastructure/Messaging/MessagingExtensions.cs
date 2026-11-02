@@ -28,8 +28,7 @@ public static class MessagingExtensions
                     host.Password(settings.Password);
                 });
 
-                cfg.MessageTopology.GetMessageTopology<UserCreatedEvent>()
-                    .SetEntityName("FCG_UserApi:user-created-event");
+                cfg.Message<FCG.Contracts.Events.UserCreatedEvent>(m => m.SetEntityName("FCG_UserApi:user-created-event"));                    
 
                 cfg.ConfigureEndpoints(context);
             });

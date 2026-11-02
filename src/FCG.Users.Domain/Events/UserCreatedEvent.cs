@@ -1,8 +1,11 @@
+using MassTransit;
+
 namespace FCG.Contracts.Events;
 
 /// <summary>
 ///     Evento disparado quando um usuário é criado. O NotificationAPI vai consumir.
 /// </summary>
+[EntityName("FCG_UserApi:user-created-event")]
 public record UserCreatedEvent
 {
     public int UserId { get; init; }
