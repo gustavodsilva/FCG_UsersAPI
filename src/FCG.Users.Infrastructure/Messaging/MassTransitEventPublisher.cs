@@ -31,7 +31,7 @@ public class MassTransitEventPublisher : IEventPublisher
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Falha ao publicar o evento {EventType}.", typeof(UserCreatedEvent).Name);
+            _logger.LogError(exception, "Falha ao publicar o evento {EventType}.", typeof(TEvent).Name);
         }
     }
 }

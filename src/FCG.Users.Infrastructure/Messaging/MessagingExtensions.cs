@@ -1,3 +1,4 @@
+using FCG.Contracts.Events;
 using FCG.Users.Domain.Interfaces;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,9 @@ public static class MessagingExtensions
                     host.Username(settings.Username);
                     host.Password(settings.Password);
                 });
+
+                cfg.MessageTopology.GetMessageTopology<UserCreatedEvent>()
+                    .SetEntityName("FCG_UserApi:user-created-event");
 
                 cfg.ConfigureEndpoints(context);
             });
