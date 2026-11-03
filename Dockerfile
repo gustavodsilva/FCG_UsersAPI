@@ -6,7 +6,7 @@ WORKDIR /src
 
 COPY src/FCG_UsersApi/FCG_UsersApi.csproj                      src/FCG_UsersApi/
 COPY src/FCG_UsersDomain/FCG_UsersDomain.csproj                src/FCG_UsersDomain/
-COPY src/FCG.Users.Infrastructure/FCG.Users.Infrastructure.csproj src/FCG.Users.Infrastructure/
+COPY src/FCG_UsersInfrastructure/FCG_UsersInfrastructure.csproj src/FCG_UsersInfrastructure/
 RUN dotnet restore src/FCG_UsersApi/FCG_UsersApi.csproj
 
 # ---------- Etapa 2: build e publish ----------
