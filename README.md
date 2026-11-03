@@ -34,12 +34,12 @@ divergirem a mensagem não chega. Detalhes e exemplo de consumer em [docs/INTEGR
 
 ```
 src/
-  FCG.Users.Api             controllers, middlewares, health checks, configuração
-  FCG.Users.Domain          entidades, regras de negócio, contrato do evento
-  FCG.Users.Infrastructure  EF Core, repositórios, migrations, JWT, MassTransit/RabbitMQ
+  FCG_UsersApi             controllers, middlewares, health checks, configuração
+  FCG_Users.Domain          entidades, regras de negócio, contrato do evento
+  FCG_Users.Infrastructure  EF Core, repositórios, migrations, JWT, MassTransit/RabbitMQ
 tests/
-  FCG.Users.UnitTests       testes de unidade e cenários BDD
-  FCG.Users.IntegrationTests
+  FCG_Users.UnitTests       testes de unidade e cenários BDD
+  FCG_Users.IntegrationTests
 docs/                       guia de integração para quem consome o evento
 k8s/                        manifestos de referência (os oficiais ficam na orquestração)
 Dockerfile                  multi-stage (restore, publish, runtime)
@@ -56,7 +56,7 @@ não traz credenciais: segredos e dados de conexão chegam por variáveis de amb
 |------------------------------------|----------|----------------------------------------------|-----------------------|
 | `ConnectionStrings__SqlConnection` | Sim      | Connection string do SQL Server              | nenhum (obrigatória)  |
 | `Jwt__SecretKey`                   | Sim      | Chave de assinatura (mínimo 32 caracteres)   | nenhum (obrigatória)  |
-| `Jwt__Issuer`                      | Não      | Emissor do token                             | `FCG.UsersAPI`        |
+| `Jwt__Issuer`                      | Não      | Emissor do token                             | `FCG_UsersAPI`        |
 | `Jwt__Audience`                    | Não      | Audiência do token                           | `FCG.Platform`        |
 | `Jwt__ExpirationInMinutes`         | Não      | Validade do token                            | `60`                  |
 | `RabbitMq__Host`                   | Não      | Host do RabbitMQ                             | `localhost`           |
@@ -126,10 +126,10 @@ Suba só as dependências e rode a API:
 
 ```bash
 docker compose up -d users-db rabbitmq
-dotnet run --project src/FCG.Users.Api
+dotnet run --project src/FCG_UsersApi
 ```
 
-Crie `src/FCG.Users.Api/appsettings.Development.json` (ignorado pelo Git e pela imagem) com a
+Crie `src/FCG_UsersApi/appsettings.Development.json` (ignorado pelo Git e pela imagem) com a
 connection string, a chave do JWT e o usuário e a senha do RabbitMQ, usando os mesmos valores do seu `.env`.
 
 ## Testes

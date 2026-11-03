@@ -4,15 +4,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS restore
 WORKDIR /src
 
-COPY src/FCG.Users.Api/FCG.Users.Api.csproj                      src/FCG.Users.Api/
-COPY src/FCG.Users.Domain/FCG.Users.Domain.csproj                src/FCG.Users.Domain/
+COPY src/FCG_UsersApi/FCG_UsersApi.csproj                      src/FCG_UsersApi/
+COPY src/FCG_UsersDomain/FCG_UsersDomain.csproj                src/FCG_UsersDomain/
 COPY src/FCG.Users.Infrastructure/FCG.Users.Infrastructure.csproj src/FCG.Users.Infrastructure/
-RUN dotnet restore src/FCG.Users.Api/FCG.Users.Api.csproj
+RUN dotnet restore src/FCG_UsersApi/FCG_UsersApi.csproj
 
 # ---------- Etapa 2: build e publish ----------
 FROM restore AS publish
 COPY src/ src/
-RUN dotnet publish src/FCG.Users.Api/FCG.Users.Api.csproj \
+RUN dotnet publish src/FCG_UsersApi/FCG_UsersApi.csproj \
     -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 # ---------- Etapa 3: imagem final (somente runtime, sem SDK) ----------
@@ -26,4 +26,4 @@ ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 USER $APP_UID
 
-ENTRYPOINT ["dotnet", "FCG.Users.Api.dll"]
+ENTRYPOINT ["dotnet", "FCG_UsersApi.dll"]
