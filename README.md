@@ -11,43 +11,69 @@ Microsserviço de **Usuários** da FIAP Cloud Games (FCG), Tech Challenge Fase 2
 
 Catálogo, Pagamentos e Notificações ficam em repositórios próprios. O UsersAPI não chama nenhum deles: só publica eventos.
 
+## Endpoints
+
+| Método | Rota                  | Acesso  | Descrição                                              |
+|--------|-----------------------|---------|--------------------------------------------------------|
+| POST   | `/api/auth/register`  | Público | Cadastra usuário (perfil Client) e publica o evento    |
+| POST   | `/api/auth/login`     | Público | Autentica e devolve o token JWT                        |
+| GET    | `/api/users`          | Admin   | Lista os usuários                                      |
+| GET    | `/api/users/{id}`     | Admin   | Consulta um usuário                                    |
+| PUT    | `/api/users/{id}`     | Admin   | Atualiza um usuário                                    |
+| DELETE | `/api/users/{id}`     | Admin   | Remove um usuário                                      |
+| GET    | `/health`             | Público | Readiness (inclui a conexão com o RabbitMQ)            |
+| GET    | `/health/live`        | Público | Liveness (o processo responde)                         |
+
 ## Fluxo orientado a eventos
 
 ```
 UsersAPI --(UserCreatedEvent)--> RabbitMQ --> NotificationsAPI (e-mail de boas-vindas)
 ```
 
-Contrato do evento (namespace `FCG.Contracts.Events`):
+O evento é publicado na exchange `FCG_UserApi:user-created-event`, em **JSON puro** (sem o
+envelope do MassTransit):
 
-| Campo     | Tipo     | Descrição            |
-|-----------|----------|----------------------|
-| UserId    | int      | Id do usuário criado |
-| Name      | string   | Nome                 |
-| Email     | string   | E-mail de destino    |
-| CreatedAt | DateTime | Data de criação      |
+| Campo    | Tipo   | Descrição            |
+|----------|--------|----------------------|
+| `userId` | int    | Id do usuário criado |
+| `name`   | string | Nome                 |
+| `email`  | string | E-mail de destino    |
 
-A senha nunca vai no evento. O consumidor deve declarar o evento com o mesmo namespace e nome
-(`FCG.Contracts.Events.UserCreatedEvent`): o MassTransit nomeia a exchange a partir deles, e se
-divergirem a mensagem não chega. Detalhes e exemplo de consumer em [docs/INTEGRACAO.md](docs/INTEGRACAO.md).
+```json
+{
+  "userId": 7,
+  "name": "Maria",
+  "email": "maria@fcg.com"
+}
+```
+
+A senha nunca vai no evento. Como consumir (exchange, fila e exemplo de código) está em
+[docs/INTEGRACAO.md](docs/INTEGRACAO.md).
+
+O evento é publicado **depois** de o usuário ser gravado. Se a publicação falhar (por exemplo,
+RabbitMQ fora do ar), o erro é registrado em log e a requisição de cadastro responde `500`, embora o
+usuário já tenha sido gravado: uma nova tentativa de cadastro devolve `409`. Uma melhoria futura é o
+padrão Outbox.
 
 ## Estrutura
 
 ```
 src/
   FCG_UsersApi             controllers, middlewares, health checks, configuração
-  FCG_Users.Domain          entidades, regras de negócio, contrato do evento
-  FCG_Users.Infrastructure  EF Core, repositórios, migrations, JWT, MassTransit/RabbitMQ
+  FCG_UsersDomain          entidades, regras de negócio, contrato do evento
+  FCG_UsersInfrastructure  EF Core, repositórios, migrations, JWT, MassTransit/RabbitMQ
 tests/
-  FCG_Users.UnitTests       testes de unidade e cenários BDD
-  FCG_Users.IntegrationTests
-docs/                       guia de integração para quem consome o evento
-k8s/                        manifestos de referência (os oficiais ficam na orquestração)
-Dockerfile                  multi-stage (restore, publish, runtime)
-docker-compose.yml          UsersAPI + SQL Server + RabbitMQ, para rodar isolado
-.env.example                modelo das variáveis secretas do Compose
+  FCG_UsersUnitTests       testes de unidade e cenários BDD
+  FCG_UsersIntegrationTests
+docs/                      guia de integração para quem consome o evento
+Dockerfile                 multi-stage (restore, publish, runtime)
+FCG_Users.sln              solução
 ```
 
-## Variáveis de ambiente da aplicação
+O Docker Compose e os manifestos do Kubernetes ficam no repositório de orquestração
+(veja a seção **Executar**).
+
+## Variáveis de ambiente
 
 No .NET, `__` (dois underscores) representa `:` na configuração. O `appsettings.json` da imagem
 não traz credenciais: segredos e dados de conexão chegam por variáveis de ambiente.
@@ -56,7 +82,7 @@ não traz credenciais: segredos e dados de conexão chegam por variáveis de amb
 |------------------------------------|----------|----------------------------------------------|-----------------------|
 | `ConnectionStrings__SqlConnection` | Sim      | Connection string do SQL Server              | nenhum (obrigatória)  |
 | `Jwt__SecretKey`                   | Sim      | Chave de assinatura (mínimo 32 caracteres)   | nenhum (obrigatória)  |
-| `Jwt__Issuer`                      | Não      | Emissor do token                             | `FCG_UsersAPI`        |
+| `Jwt__Issuer`                      | Não      | Emissor do token                             | `FCG.UsersAPI`        |
 | `Jwt__Audience`                    | Não      | Audiência do token                           | `FCG.Platform`        |
 | `Jwt__ExpirationInMinutes`         | Não      | Validade do token                            | `60`                  |
 | `RabbitMq__Host`                   | Não      | Host do RabbitMQ                             | `localhost`           |
@@ -66,53 +92,72 @@ não traz credenciais: segredos e dados de conexão chegam por variáveis de amb
 | `RabbitMq__Password`               | Sim      | Senha do broker                              | nenhum (obrigatória)  |
 
 `Jwt__SecretKey`, `Jwt__Issuer` e `Jwt__Audience` precisam ser **iguais** nos serviços que validam
-o token emitido por este.
+o token emitido por este. A API não sobe se a chave tiver menos de 32 caracteres.
 
-## Executar com Docker Compose
+## Executar
 
-O Compose lê os segredos do arquivo `.env`, que não vai para o Git.
+### Com a aplicação completa (recomendado)
 
-1. Crie o `.env` a partir do modelo:
+O Docker Compose e os manifestos do Kubernetes estão no repositório de orquestração:
+[FCG-Orchestration](https://github.com/pri-pereiras/FCG-Orchestration). Siga o README dele, que
+sobe este serviço com o banco, o RabbitMQ e os demais serviços, já com as variáveis acima. No
+cluster, o serviço fica acessível aos demais em `http://users-api:80`.
 
-   ```bash
-   cp .env.example .env
-   ```
+### Só este serviço, na sua máquina
 
-2. Preencha as quatro variáveis:
-
-   | Variável             | Descrição                                          |
-   |----------------------|----------------------------------------------------|
-   | `MSSQL_SA_PASSWORD`  | Senha do SQL Server (8+ caracteres, com maiúscula, minúscula, número e símbolo) |
-   | `JWT_SECRET_KEY`     | Chave do JWT (32+ caracteres, igual à dos outros serviços) |
-   | `RABBITMQ_USER`      | Usuário do RabbitMQ                                |
-   | `RABBITMQ_PASS`      | Senha do RabbitMQ                                  |
-
-3. Suba tudo:
+1. Suba as dependências (troque `<senha>` e `<usuario>` pelos valores que preferir):
 
    ```bash
-   docker compose up -d --build
-   docker compose ps
+   docker run -d --name fcg-users-db \
+     -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD='<senha>' \
+     -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+
+   docker run -d --name fcg-rabbitmq \
+     -e RABBITMQ_DEFAULT_USER='<usuario>' -e RABBITMQ_DEFAULT_PASS='<senha>' \
+     -p 5672:5672 -p 15672:15672 rabbitmq:3.13-management
    ```
 
-4. Acesse:
-   - Swagger: http://localhost:8080
-   - Painel do RabbitMQ: http://localhost:15672 (usuário e senha do `.env`)
+   A senha do SQL Server precisa ter 8+ caracteres, com maiúscula, minúscula, número e símbolo.
 
-O SQL Server guarda a senha dentro do volume. Se você trocar o `MSSQL_SA_PASSWORD` depois da primeira
-execução, rode `docker compose down -v` antes de subir de novo (isso apaga os dados do banco).
+2. Crie `src/FCG_UsersApi/appsettings.Development.json` (ignorado pelo Git e pela imagem):
+
+   ```json
+   {
+     "ConnectionStrings": {
+       "SqlConnection": "Server=localhost,1433;Database=FcgUsersDb;User Id=sa;Password=<senha>;TrustServerCertificate=True;"
+     },
+     "Jwt": {
+       "SecretKey": "<chave com 32 ou mais caracteres>"
+     },
+     "RabbitMq": {
+       "Username": "<usuario>",
+       "Password": "<senha>"
+     }
+   }
+   ```
+
+3. Rode a API:
+
+   ```bash
+   dotnet run --project src/FCG_UsersApi
+   ```
+
+As migrations e o seed são aplicados na largada. Painel do RabbitMQ: http://localhost:15672.
 
 ## Testar o fluxo de cadastro
 
-Pelo Swagger (http://localhost:8080):
+Pelo Swagger (na raiz da porta em que a API estiver publicada):
 
 1. `POST /api/auth/register` com nome, e-mail, login e senha. Esperado: `201`, com `perfil: 2` (Client).
 2. `POST /api/auth/login`. Esperado: `200`, com o `token`.
-3. No painel do RabbitMQ, em **Exchanges**, confira `FCG.Contracts.Events:UserCreatedEvent`.
+3. No painel do RabbitMQ, em **Exchanges**, confira `FCG_UserApi:user-created-event`.
 
-Para os endpoints protegidos, clique em **Authorize** e informe `Bearer {token}` (com a palavra
-`Bearer`, um espaço e o token). `GET /api/users` exige perfil Admin: com token de Client retorna `403`.
+Para os endpoints protegidos, clique em **Authorize** e informe `Bearer {token}` (a palavra `Bearer`,
+um espaço e o token). Para trocar de usuário, volte ao botão e cole o novo token. `GET /api/users`
+exige perfil Admin: com token de Client retorna `403`.
 
-O seed cria um administrador para desenvolvimento: login `admin`, senha `Admin@123`.
+O seed cria o administrador `admin` (senha `Admin@123`) e usuários de teste da equipe
+(veja `DbInitializer`). São dados de desenvolvimento.
 
 ## Autenticação e perfis
 
@@ -120,17 +165,9 @@ O token JWT é emitido por este serviço e validado localmente pelos demais (ass
 e validade), sem consulta ao UsersAPI. O token carrega o id do usuário, e-mail, nome e perfil
 (`Admin` ou `Client`).
 
-## Executar a API fora do Docker
-
-Suba só as dependências e rode a API:
-
-```bash
-docker compose up -d users-db rabbitmq
-dotnet run --project src/FCG_UsersApi
-```
-
-Crie `src/FCG_UsersApi/appsettings.Development.json` (ignorado pelo Git e pela imagem) com a
-connection string, a chave do JWT e o usuário e a senha do RabbitMQ, usando os mesmos valores do seu `.env`.
+As respostas de erro seguem o formato `ProblemDetails` (RFC 7807): `400` (dados inválidos), `401`
+(token ausente, inválido ou expirado), `403` (perfil sem permissão), `404`, `409` (login ou e-mail já
+cadastrado) e `500`.
 
 ## Testes
 
@@ -140,22 +177,11 @@ dotnet test
 
 ## Imagem Docker
 
-Publicada no Docker Hub: `gustavotianosilva/fcg-users-api`.
+Publicada no Docker Hub: [`gustavotianosilva/fcg-users-api`](https://hub.docker.com/r/gustavotianosilva/fcg-users-api).
 
-| Tag      | Uso                                                        |
-|----------|------------------------------------------------------------|
-| `1.0.0`  | Versão fixa, a que a orquestração deve referenciar        |
-| `latest` | Última publicada                                           |
+Use sempre uma **tag de versão** (por exemplo `1.0.1`), e não o `latest`; as tags disponíveis estão
+na página do repositório. A imagem roda sem root na porta `8080` e não contém credenciais.
 
-A imagem roda sem root na porta `8080` e não contém credenciais.
-
-## Kubernetes
-
-Os manifestos oficiais (Deployment, Service, ConfigMap e Secret) ficam no repositório de orquestração
-(FCG-Orchestration). A pasta `k8s/` deste repositório é uma versão de referência e pode estar
-desatualizada em relação a ele. No cluster, o serviço fica acessível aos demais em `http://users-api:80`.
-
-## Health checks
-
-- `GET /health`: readiness, inclui a conexão com o RabbitMQ
-- `GET /health/live`: liveness, só indica que o processo responde
+```bash
+docker build -t gustavotianosilva/fcg-users-api:<versao> .
+```
