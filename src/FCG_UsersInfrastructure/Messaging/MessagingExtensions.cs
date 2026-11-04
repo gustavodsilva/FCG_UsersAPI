@@ -28,7 +28,12 @@ public static class MessagingExtensions
                     host.Password(settings.Password);
                 });
 
-                cfg.Message<FCG_UsersDomain.Events.UserCreatedEvent>(m => m.SetEntityName("FCG_UserApi:user-created-event"));                    
+                cfg.UseRawJsonSerializer(
+                    RawSerializerOptions.AddTransportHeaders |
+                    RawSerializerOptions.CopyHeaders);
+
+                cfg.Message<UserCreatedEvent>(m =>
+                    m.SetEntityName("FCG_UserApi:user-created-event"));                  
 
                 cfg.ConfigureEndpoints(context);
             });
